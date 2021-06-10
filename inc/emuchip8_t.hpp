@@ -10,8 +10,10 @@ public:
 	~Chip8() = default;
 	void step(); // one cpu cycle
 	void init(); // reset everything
-  void load(char*); // load new program into memory
+	void load(char*); // load new program into memory
 	void clearScreen();
+	void draw();
+	void quit();
 	unsigned char retKey();
 
 	unsigned char V[15]; // general purpose register
@@ -30,7 +32,8 @@ public:
 
 	unsigned char memory[4096];
 
-  SDL_Window* window = NULL;
+	bool running = true;
+	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
 
 };

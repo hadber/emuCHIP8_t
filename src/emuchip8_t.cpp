@@ -2,6 +2,7 @@
 #include <SDL2/SDL.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -52,10 +53,10 @@ void Chip8::init() {
 			screenSurface = SDL_GetWindowSurface( window );
 
 			//Fill the surface white
-			SDL_FillRect( screenSurface, NULL, SDL_MapRGB( screenSurface->format, 0x00, 0x00, 0x00 ) );
+			SDL_FillRect(screenSurface, NULL, SDL_MapRGB( screenSurface->format, 0x00, 0x00, 0x00 ));
 
 			//Update the surface
-			SDL_UpdateWindowSurface( window );
+			SDL_UpdateWindowSurface(window);
 
 			//Wait two seconds
 	//			SDL_Delay( 2000 );
@@ -98,6 +99,13 @@ void Chip8::load(char* path) {
 */
 }
 
+void Chip8::quit() {
+
+	std::cout << "Exit button pressed - goodbye! " << "\n";
+	running = false;
+	SDL_Quit();
+}
+
 void Chip8::step() {
 
 	this->opcode = (memory[this->pc]<<8) | memory[this->pc+1];
@@ -107,6 +115,17 @@ void Chip8::step() {
 	unsigned char n = this->opcode & 0x000F;
 	unsigned char nn = this->opcode & 0x00FF;
 	unsigned short nnn = this->opcode & 0x0FFF;
+
+	//std::cout << "Processing opcode: " << this->opcode << "\n";
+	SDL_Event e;
+	while(SDL_PollEvent( &e )) {	// Handle events in queue
+		switch(e.type) {
+			case SDL_QUIT: {
+				quit();
+				break;
+			}
+		}
+	}
 
 	switch(this->opcode & 0xF000) {
 		case 0x0000: {// clear the display, return from subroutine
@@ -224,7 +243,7 @@ void Chip8::step() {
 			int pos_x, pos_y;
 			unsigned short addr = this->I;
 			pos_x = V[vx] > 0 ? V[vx] % 64 : 0;
-			pos_y = V[vy] > 0 ? V[vy] % 64 : 0;
+			pos_y = V[vy] > 0 ? V[vy] % 32 : 0;
 			V[0xF] = 0x00;
 			for(int i = 0; i < n; i++) {
 				V[0xF] = 0x01;
@@ -295,7 +314,15 @@ void Chip8::step() {
 					break;
 				}
 				case 0x0055: {
-
+					for(int i = 0; i < vx; i++)
+						memory[this->I+i] = V[i];
+					break;
+				}
+				case 0x0065: {
+					for(int i = 0; i < vx; i++) {
+						V[i] = memory[this->I+i];
+					}
+					break;
 				}
 			}
 
@@ -307,6 +334,8 @@ void Chip8::step() {
 		}
 	}
 	this->pc += 2;
+	draw();
+	//usleep(1);
 }
 
 unsigned char Chip8::retKey() {
@@ -339,4 +368,18 @@ unsigned char Chip8::retKey() {
 
 void Chip8::clearScreen() {
 
+}
+
+void Chip8::draw(){
+	for(int i = 0; i < 32; i++) {
+		for(int j = 0; j < 64; j++) {
+			
+			if(display[i][j]) {
+				SDL_Rect fillRect = {i, j, 10, 10}; // (x, y, width, heigth)
+				SDL_FillRect(screenSurface, &fillRect, SDL_MapRGB( screenSurface->format, 0xFF, 0xFF, 0xFF ));
+			}
+
+		}
+	}
+	SDL_UpdateWindowSurface(window);
 }
