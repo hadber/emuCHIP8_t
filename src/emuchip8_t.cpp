@@ -7,6 +7,8 @@
 #include <iostream>
 #include <iomanip>
 
+#define DEBUG
+
 
 
 Chip8::Chip8() {
@@ -16,6 +18,8 @@ Chip8::Chip8() {
 void Chip8::init() {
 	const int SCREEN_WIDTH = 640;
 	const int SCREEN_HEIGHT = 320;
+
+	done = false;
 
 	unsigned char chip8_fontset[80] =
 	{
@@ -37,25 +41,25 @@ void Chip8::init() {
 	    0xF0, 0x80, 0xF0, 0x80, 0x80  //F
 	};
 
+	// clear memory
+	memset(this->memory, 0, sizeof(this->memory));
+
 	for(int i = 0; i < 80; i++) // load the fontset in memory 0x000 - 0x1FF
 		memory[i] = chip8_fontset[i];
+
+	// clear out the display
+	memset(display, 0, sizeof(display));
 
 	//Initialize SDL
   if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) {
 		std::cout <<  "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
   } else {
-	//Create window
 		window = SDL_CreateWindow( "CHIP-8", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
 		if( window == NULL ) {
 			std::cout <<  "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
 		}	else {
-			//Get window surface
 			screenSurface = SDL_GetWindowSurface( window );
-
-			//Fill the surface white
 			SDL_FillRect(screenSurface, NULL, SDL_MapRGB( screenSurface->format, 0x00, 0x00, 0x00 ));
-
-			//Update the surface
 			SDL_UpdateWindowSurface(window);
 
 			//Wait two seconds
@@ -63,16 +67,8 @@ void Chip8::init() {
 		}
 	}
 
-	memset(this->memory, 0, sizeof(this->memory));
 	this->pc = 0x200;
 
-/*
-	//Destroy window
-	SDL_DestroyWindow( window );
-
-	//Quit SDL subsystems
-	SDL_Quit();
-*/
 }
 
 void Chip8::load(char* path) {
@@ -88,6 +84,21 @@ void Chip8::load(char* path) {
 		inst = ch8_prog.get();
 	}
 
+	/*
+	This code here is specific to https://github.com/Timendus/chip8-test-suite
+	when running on chip8-test-suite.ch8, if we want to load a specific test 
+	(out of the 5 available tests), we simply load into memory 1-5 at address 0x1FF
+	*/
+	enum AVAILABLE_TESTS {
+		IBM_LOGO,
+		CORAX_OPCODE,
+		FLAGS,
+		QUIRKS,
+		KEYPAD
+	};
+
+	//memory[0x1FF] = IBM_LOGO;
+
 	// debug below
 /*
 	std::cout << std::endl;
@@ -99,36 +110,129 @@ void Chip8::load(char* path) {
 */
 }
 
-void Chip8::quit() {
-
+bool Chip8::quit() {
 	std::cout << "Exit button pressed - goodbye! " << "\n";
-	running = false;
 	SDL_Quit();
+	return true; //done = true;
 }
 
-void Chip8::step() {
+void Chip8::run() {
+	// does it work? yes. is it pretty? no.
+	bool finishedProcessing = false;
+	
+	//while(true) {
+	for(int i = 0; i < 39; i++) {
+		bool stepToNext = false;
+		SDL_Event e;
+		while(SDL_PollEvent( &e )) {	// Handle events in queue
+			//std::cout << "Polling for events with event: " << (uint32_t)e << std::endl;
+			switch(e.type) {
+				case SDL_QUIT: {
+					done = quit();
+					break;
+				}
+				case SDL_KEYUP: {
+					if(e.key.keysym.sym == SDLK_SPACE) {
+						std::cout << "Space pressed!" << std::endl;
+						stepToNext = true;
+					}
+				}
+			}
+		}
+		if(done)
+			break;
+
+		// set this to false in order to auto run everything
+		// and not step manually through shit
+		if(false) {
+			if(stepToNext) {
+				step();
+			}
+		}
+		else {
+			if(!finishedProcessing) {
+				finishedProcessing = step();
+			}
+		}
+	}
+	std::cin.get();
+}
+
+void Chip8::drawSprite(int posX, int posY, int rows)
+{
+	//unsigned short address = I;
+	std::cout << "Trying to draw a sprite!" << std::endl;
+	V[0xF] = 0x00;
+	for(int i = 0; i < rows; i++) 
+	{
+		unsigned char currentByte = memory[I + i];
+		for(int j = 0; j < 8; j++) 
+		{
+			bool currentPixelValue = display[posY+j][posX+i];
+			bool nextPixelValue = (currentByte & (0x80>>j)) > 0 ? true : false;
+			if(currentPixelValue != nextPixelValue) // if it changed
+				V[0xF] = 0x01;
+			display[posY+j][posX+i] = currentPixelValue ^ nextPixelValue;
+		}
+	}
+	//draw();
+}
+
+void Chip8::printMemory(unsigned short bytesAmount, unsigned short start=0) 
+{
+	auto printByte = [](unsigned char byte)
+	{
+		for(int i = 0; i < 8; i++) 
+		{
+			std::cout << ((byte & (0x80>>i)) == 0 ? "0" : "*");
+		}
+		std::cout << std::endl;
+	};
+
+	for(int i = start; i < bytesAmount; i++) 
+	{
+		std::cout << std::hex << i << "\t|\t";
+		printByte(memory[i]);
+	}
+}
+
+void Chip8::printScreen()
+{
+	//bool display[64][32];
+	for(int i = 0; i < 64; i++) 
+	{
+		for(int j = 0; j < 32; j++) 
+		{
+			std::cout << (display[i][j] ? "+" : "0");
+		}
+		std::cout << std::endl;
+	}
+
+}
+
+bool Chip8::step() {
 
 	this->opcode = (memory[this->pc]<<8) | memory[this->pc+1];
 
-	unsigned char vx = this->opcode & 0x0F00;
-	unsigned char vy = this->opcode & 0x00F0;
+	unsigned char vx = (this->opcode & 0x0F00) >> 8;
+	unsigned char vy = (this->opcode & 0x00F0) >> 4;
 	unsigned char n = this->opcode & 0x000F;
 	unsigned char nn = this->opcode & 0x00FF;
 	unsigned short nnn = this->opcode & 0x0FFF;
 
-	//std::cout << "Processing opcode: " << this->opcode << "\n";
-	SDL_Event e;
-	while(SDL_PollEvent( &e )) {	// Handle events in queue
-		switch(e.type) {
-			case SDL_QUIT: {
-				quit();
-				break;
-			}
-		}
+#if defined(DEBUG)
+	std::cout << "Processing opcode: " << std::uppercase << std::hex << this->opcode << std::endl;
+	std::cout << std::dec << "[pc: " << this->pc << "]" << std::endl;
+
+	// print register contents
+	for(int i = 0; i < 16; i++) {
+		std::cout << "V[" << i << "]:" << std::hex << V[i] << "\t" ;
 	}
+	std::cout << std::endl;
+#endif
 
 	switch(this->opcode & 0xF000) {
-		case 0x0000: {// clear the display, return from subroutine
+		case 0x0000: { // clear the display, return from subroutine
 			if((this->opcode & 0x000F) == 0x000E) { // return from subroutine
 				this->pc = this->stack[--sp];
 				this->pc -= 2;
@@ -240,21 +344,10 @@ void Chip8::step() {
 			break;
 		}
 		case 0xD000: {
-			int pos_x, pos_y;
-			unsigned short addr = this->I;
-			pos_x = V[vx] > 0 ? V[vx] % 64 : 0;
-			pos_y = V[vy] > 0 ? V[vy] % 32 : 0;
-			V[0xF] = 0x00;
-			for(int i = 0; i < n; i++) {
-				V[0xF] = 0x01;
-				for(int j = 0; j < 8; j++) {
-					unsigned char the_bit = (memory[addr+i] & (0x80>>(j-1))) > 0 ? 1 : 0;
-
-					if(display[pos_x+i][pos_y+j] > the_bit)
-						V[0xF] = 0x01;
-					display[pos_x+i][pos_y+j] = the_bit ^ display[pos_x+i][pos_y+j];
-				}
-			}
+			int posX, posY;
+			posX = V[vx] > 0 ? V[vx] % 63 : 0;
+			posY = V[vy] > 0 ? V[vy] % 31 : 0;
+			drawSprite(posX, posY, n);
 			break;
 		}
 		case 0xE000: {
@@ -333,9 +426,16 @@ void Chip8::step() {
 			break;
 		}
 	}
-	this->pc += 2;
+
 	draw();
-	//usleep(1);
+
+	if((this->pc + 2) >= 4096) {
+		std::cout << "Reached the end of the program!" << std::endl;
+		return true;
+	}
+
+	this->pc += 2;
+	return false;
 }
 
 unsigned char Chip8::retKey() {
@@ -366,8 +466,48 @@ unsigned char Chip8::retKey() {
 	return 0xFF;
 }
 
-void Chip8::clearScreen() {
+inline void Chip8::clearScreen() {
+	memset(display, 0, sizeof(display));
+}
 
+void Chip8::testDisplay() {
+	//display[0][0] = true;
+	//display[0][1] = true;
+	//display[0][2] = true;
+
+	//display[10][10] = true;
+	
+
+	/*for(int i = 0; i < 32; i++) {
+		display[i][i] = true;
+	}*/
+
+//-----------------------------------------
+	// here we draw, starting from 0, 0
+	// our first character in the charset
+	// 0
+	I = 0;
+	printScreen();
+	std::cout << "---------" << std::endl;
+	drawSprite(0, 0, 5);
+	printScreen();
+	//printMemory(80);
+//-----------------------------------------
+
+	std::cin.get();
+/*	while(!done) {
+		draw();
+		SDL_Event e;
+		while(SDL_PollEvent( &e )) {	// Handle events in queue
+			switch(e.type) {
+				case SDL_QUIT: {
+					quit();
+					break;
+				}
+			}
+		}
+	}
+*/
 }
 
 void Chip8::draw(){
@@ -375,7 +515,8 @@ void Chip8::draw(){
 		for(int j = 0; j < 64; j++) {
 			
 			if(display[i][j]) {
-				SDL_Rect fillRect = {i, j, 10, 10}; // (x, y, width, heigth)
+//				std::cout << i << "," << j << ":" << display[i][j] << std::endl;
+				SDL_Rect fillRect = {i*10, j*10, 10, 10}; // (x, y, width, heigth)
 				SDL_FillRect(screenSurface, &fillRect, SDL_MapRGB( screenSurface->format, 0xFF, 0xFF, 0xFF ));
 			}
 

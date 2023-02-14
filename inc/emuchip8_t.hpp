@@ -8,14 +8,19 @@ class Chip8 {
 public:
 	Chip8();
 	~Chip8() = default;
-	void step(); // one cpu cycle
+	bool step(); // one cpu cycle
 	void init(); // reset everything
-	void load(char*); // load new program into memory
+	void load(char* path); // load new program into memory
 	void clearScreen();
+	void drawSprite(int, int, int);
+	void printMemory(unsigned short, unsigned short);
 	void draw();
-	void quit();
+	bool quit();
+	void run();
+	void testDisplay();
+	void printScreen();
 	unsigned char retKey();
-
+private:
 	unsigned char V[15]; // general purpose register
 	unsigned short I; // register I, generally used for memory
 
@@ -28,11 +33,11 @@ public:
 
 	unsigned short stack[16];
 
-	unsigned char display[64][32];
+	bool display[64][32];
 
 	unsigned char memory[4096];
 
-	bool running = true;
+	bool done;
 	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
 

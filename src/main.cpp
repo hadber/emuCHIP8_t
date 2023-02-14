@@ -7,12 +7,13 @@ int main(int argc, char* args[]) {
 			std::cout << "Usage: " << args[0] << " <chip8_prog.ch8>" << std::endl;
 			exit(1);
 		}
-
+		if(argc == 3) {
+			
+		}
 		Chip8 chip8inst;
 		chip8inst.init();
+//		chip8inst.testDisplay();
 		chip8inst.load(args[1]);
-		while(chip8inst.running) {
-			chip8inst.step();
-		}
+		chip8inst.run();
 	return 0;
 }
