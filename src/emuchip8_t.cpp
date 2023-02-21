@@ -90,6 +90,7 @@ void Chip8::load(char* path) {
 	(out of the 5 available tests), we simply load into memory 1-5 at address 0x1FF
 	*/
 	enum AVAILABLE_TESTS {
+		NOTHING,
 		IBM_LOGO,
 		CORAX_OPCODE,
 		FLAGS,
@@ -97,7 +98,7 @@ void Chip8::load(char* path) {
 		KEYPAD
 	};
 
-	memory[0x1FF] = CORAX_OPCODE;
+	memory[0x1FF] = IBM_LOGO;
 
 	// debug below
 /*
@@ -223,7 +224,8 @@ bool Chip8::step() {
 
 #if defined(DEBUG)
 	std::cout << "Processing opcode: " << std::uppercase << std::hex << this->opcode << std::endl;
-	std::cout << std::dec << "[pc: " << this->pc << "]" << std::endl;
+	std::cout << std::dec << "[pc: " << this->pc << "]" \
+				<< "[I: " << std::hex << I << "]" << std::endl;
 
 	// print register contents
 	for(int i = 0; i < 16; i++) {
@@ -373,16 +375,10 @@ bool Chip8::step() {
 				case 0x000A: {
 					bool pressed = false;
 					while(!pressed) {
-						//std::cout << "nothing pressed yet" << std::endl;
-						SDL_Event e;
-						SDL_PollEvent(&e);
-						if( e.type == SDL_KEYDOWN ) {
-							unsigned char pKey = retKey();
-							std::cout << "something pressed, specifically: " << std::hex << pKey << std::endl;
-							if(pKey != 0xFF) {
-								pressed = true;
-								V[vx] = pKey;
-							}
+						unsigned char pKey = retKey();
+						if(pKey != 0xFF) {
+							pressed = true;
+							V[vx] = pKey;
 						}
 					}
 					break;
@@ -446,7 +442,8 @@ unsigned char Chip8::retKey() {
 	SDL_Event e;
 	SDL_PollEvent(&e);
 
-	if(e.type == SDL_KEYDOWN)	{
+	if(e.type == SDL_KEYUP)	{
+		std::cout << e.key.keysym.sym << std::endl;
 		switch( e.key.keysym.sym ) {
 			case SDLK_1: return 0x01;
 			case SDLK_2: return 0x02;
