@@ -97,7 +97,7 @@ void Chip8::load(char* path) {
 		KEYPAD
 	};
 
-	//memory[0x1FF] = IBM_LOGO;
+	memory[0x1FF] = CORAX_OPCODE;
 
 	// debug below
 /*
@@ -119,9 +119,9 @@ bool Chip8::quit() {
 void Chip8::run() {
 	// does it work? yes. is it pretty? no.
 	bool finishedProcessing = false;
-	
-	//while(true) {
-	for(int i = 0; i < 39; i++) {
+
+	while(true) {	
+	//for(int i = 0; i < 39; i++) {
 		bool stepToNext = false;
 		SDL_Event e;
 		while(SDL_PollEvent( &e )) {	// Handle events in queue
@@ -160,8 +160,6 @@ void Chip8::run() {
 
 void Chip8::drawSprite(int posX, int posY, int rows)
 {
-	//unsigned short address = I;
-	std::cout << "Trying to draw a sprite!" << std::endl;
 	V[0xF] = 0x00;
 	for(int i = 0; i < rows; i++) 
 	{
@@ -210,8 +208,11 @@ void Chip8::printScreen()
 
 }
 
+int howManySteps = 0;
+
 bool Chip8::step() {
 
+	std::cout << "Current step: " << howManySteps++ << std::endl;
 	this->opcode = (memory[this->pc]<<8) | memory[this->pc+1];
 
 	unsigned char vx = (this->opcode & 0x0F00) >> 8;
@@ -232,7 +233,8 @@ bool Chip8::step() {
 #endif
 
 	switch(this->opcode & 0xF000) {
-		case 0x0000: { // clear the display, return from subroutine
+		case 0x0000: // clear the display, return from subroutine
+		{
 			if((this->opcode & 0x000F) == 0x000E) { // return from subroutine
 				this->pc = this->stack[--sp];
 				this->pc -= 2;
@@ -324,7 +326,7 @@ bool Chip8::step() {
 			}
 			break;
 		}
-		case 0x9000: {
+		case 0x9000: { // skip next instr if Vx != Vy
 			if(V[vx] != V[vy])
 				this->pc += 2;
 			break;
@@ -333,7 +335,7 @@ bool Chip8::step() {
 			this->I = nnn;
 			break;
 		}
-		case 0xB000: {
+		case 0xB000: { // jump to loc + V0
 			this->pc = nnn + V[0];
 			this->pc -= 2;
 			break;
@@ -347,7 +349,7 @@ bool Chip8::step() {
 			int posX, posY;
 			posX = V[vx] > 0 ? V[vx] % 63 : 0;
 			posY = V[vy] > 0 ? V[vy] % 31 : 0;
-			drawSprite(posX, posY, n);
+			drawSprite(posY, posX, n);
 			break;
 		}
 		case 0xE000: {
@@ -369,12 +371,14 @@ bool Chip8::step() {
 					V[vx] = delay_timer;
 					break;
 				case 0x000A: {
-					SDL_Event e;
-					SDL_PollEvent(&e);
 					bool pressed = false;
 					while(!pressed) {
+						//std::cout << "nothing pressed yet" << std::endl;
+						SDL_Event e;
+						SDL_PollEvent(&e);
 						if( e.type == SDL_KEYDOWN ) {
 							unsigned char pKey = retKey();
+							std::cout << "something pressed, specifically: " << std::hex << pKey << std::endl;
 							if(pKey != 0xFF) {
 								pressed = true;
 								V[vx] = pKey;
@@ -511,8 +515,8 @@ void Chip8::testDisplay() {
 }
 
 void Chip8::draw(){
-	for(int i = 0; i < 32; i++) {
-		for(int j = 0; j < 64; j++) {
+	for(int i = 0; i < 64; i++) {
+		for(int j = 0; j < 32; j++) {
 			
 			if(display[i][j]) {
 //				std::cout << i << "," << j << ":" << display[i][j] << std::endl;

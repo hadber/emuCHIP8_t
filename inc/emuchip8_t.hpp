@@ -40,7 +40,6 @@ private:
 	bool done;
 	SDL_Window* window = NULL;
 	SDL_Surface* screenSurface = NULL;
-
 };
 
 #endif
